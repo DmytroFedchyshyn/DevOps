@@ -1,0 +1,136 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS CloudFormation Sample Template for DevOps Infrastructure'
+
+Parameters:
+  KeyName:
+    Description: 'devops'
+    Type: 'AWS::EC2::KeyPair::KeyName'
+
+Resources:
+  DevOpsVPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: '10.0.0.0/16'
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+
+  PublicSubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref DevOpsVPC
+      CidrBlock: '10.0.1.0/24'
+      MapPublicIpOnLaunch: 'true'
+
+  PublicSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref DevOpsVPC
+      CidrBlock: '10.0.2.0/24'
+      MapPublicIpOnLaunch: 'true'
+
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+
+  AttachGateway:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref DevOpsVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  RouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref DevOpsVPC
+
+  Route:
+    Type: 'AWS::EC2::Route'
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+
+  AssociateRouteTable1:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref RouteTable
+
+  AssociateRouteTable2:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref RouteTable
+
+  MySecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Enable SSH access'
+      VpcId: !Ref DevOpsVPC
+      SecurityGroupIngress:
+        - IpProtocol: 'tcp'
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: '0.0.0.0/0'
+
+  EC2Instance1:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: 't3.micro'
+      SecurityGroupIds: [!Ref MySecurityGroup]
+      KeyName: !Ref KeyName
+      SubnetId: !Ref PublicSubnet1
+      ImageId: 'ami-07ec4220c92589b40'
+
+  EC2Instance2:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: 't3.micro'
+      SecurityGroupIds: [!Ref MySecurityGroup]
+      KeyName: !Ref KeyName
+      SubnetId: !Ref PublicSubnet2
+      ImageId: 'ami-07ec4220c92589b40'
+
+  EIP1:
+    Type: 'AWS::EC2::EIP'
+    Properties:
+      Domain: 'vpc'
+
+  EIPAssociation1:
+    Type: 'AWS::EC2::EIPAssociation'
+    Properties:
+      InstanceId: !Ref EC2Instance1
+      AllocationId: !GetAtt EIP1.AllocationId
+
+  EIP2:
+    Type: 'AWS::EC2::EIP'
+    Properties:
+      Domain: 'vpc'
+
+  EIPAssociation2:
+    Type: 'AWS::EC2::EIPAssociation'
+    Properties:
+      InstanceId: !Ref EC2Instance2
+      AllocationId: !GetAtt EIP2.AllocationId
+
+  S3LogBucket:
+    Type: 'AWS::S3::Bucket'
+
+  S3Bucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      VersioningConfiguration:
+        Status: 'Enabled'
+      LoggingConfiguration:
+        DestinationBucketName: !Ref S3LogBucket
+        LogFilePrefix: 'logs/'
+
+
+Outputs:
+  EC2Instance1ElasticIP:
+    Description: 'Elastic IP address of EC2 instance 1'
+    Value: !Ref EIP1
+
+  EC2Instance2ElasticIP:
+    Description: 'Elastic IP address of EC2 instance 2'
+    Value: !Ref EIP2

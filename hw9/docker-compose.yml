@@ -1,0 +1,18 @@
+version: '3'
+services:
+  nginx:
+    build: ./nginx
+    ports:
+      - "80:80"
+    networks:
+      - webnet
+
+  nodeapp:
+    build: ./nodeapp
+    ports:
+      - "3000:3000"
+    networks:
+      - webnet
+
+networks:
+  webnet:
